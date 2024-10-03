@@ -1,0 +1,158 @@
+---
+title: "p8105_hw2_xw2972"
+author: "Xiwen Wu"
+output: github_document
+date: 2024-10-02
+---
+
+# Problem 1
+The dataset, NYC Transit Subway Entrance and Exit Data, contains information about subway entrances and exits in New York City. The variables include line, station, name, station latitude / longitude, routes served, entry, vending, entrance type, and ADA compliance in the resulting dataset. In the data cleaning process, I first cleaned the column names using the janitor::clean_names() function. Then, I selected relevant column and converted the entry variable from a character format to a logical variable. It has 1868 rows and 19 columns, which are not tidy.
+There are 465 distinct stations. 
+There are 84 ADA compliant stations. 
+37.7% station entrances / exits without vending allow entrance.
+60 distinct stations serve the A train.
+17 stations that serve the A train are ADA compliant.
+```{r}
+library(tidyverse)
+subway_df = 
+    read_csv("NYC_Transit_Subway_Entrance_And_Exit_Data.csv", na = c("NA", ".", ""))
+subway_df = 
+    janitor::clean_names(subway_df)
+subway_df = subway_df %>%
+  select(line:entry, vending, ada) %>%
+  mutate(entry = ifelse(entry == "YES", TRUE, FALSE))
+distinct_stations = subway_df %>%
+  distinct(station_name, line) %>%
+  nrow()
+ada_compliant_stations = subway_df %>%
+  filter(ada == TRUE) %>%
+  distinct(station_name, line) %>%
+  nrow()
+proportion_without_vending = subway_df %>%
+  filter(vending == "NO") %>%
+  summarize(proportion_entry = mean(entry, na.rm = TRUE)) %>%
+  pull(proportion_entry)
+
+#Reformat data
+subway_df = subway_df %>%
+  mutate(across(starts_with("route"), as.character))
+subway_df_long = subway_df %>%
+  pivot_longer(cols = starts_with("route"), names_to = "route_number", values_to = "route_name", values_drop_na = TRUE)
+a_train_stations = subway_df_long %>%
+  filter(route_name == "A") %>%
+  distinct(station_name, line) %>%
+  nrow()
+ada_compliant_a_train_stations = subway_df_long %>%
+  filter(route_name == "A", ada == TRUE) %>%
+  distinct(station_name, line) %>%
+  nrow()
+```
+
+# Problem 2
+The combined dataset for the Trash Wheel collection includes data from three different trash-collecting entities: Mr. Trash Wheel, Professor Trash Wheel, and Gwynnda Trash Wheel. This dataset has been cleaned to remove rows with missing key variables. In total, the dataset contains 845 observations with keys variables, such as weight of trash collected and items like plastic bottles, polystyrene, after cleaning. The total weight of trash collected by Professor Trash Wheel is 241.26. The total number of cigarette butts collected by Gwynnda in June of 2022 is 18120.
+```{r}
+library(tidyverse)
+Mr = 
+  readxl::read_excel("~/Desktop/p8105_hw2_xw2972/202409 Trash Wheel Collection Data.xlsx", sheet = "Mr. Trash Wheel", range = "A2:N653")|>
+  mutate(Company = "Mr._Trash_Wheel")
+Mr = 
+    janitor::clean_names(Mr)
+Mr_cleaned = Mr %>%
+  filter(!is.na(weight_tons) & !is.na(volume_cubic_yards) & 
+         !is.na(plastic_bottles) & !is.na(polystyrene) & 
+         !is.na(cigarette_butts)& !is.na(glass_bottles)& !is.na(plastic_bags)& !is.na(wrappers)& !is.na(sports_balls)&          !is.na(homes_powered))%>%
+  mutate(sports_balls = as.integer(round(sports_balls)), year = as.character(year))
+
+Professor = 
+  readxl::read_excel("~/Desktop/p8105_hw2_xw2972/202409 Trash Wheel Collection Data.xlsx", sheet = "Professor Trash Wheel", range = "A2:M120")|>
+  mutate(Company = "Professor_Trash_Wheel")
+Professor = 
+    janitor::clean_names(Professor)
+Professor_cleaned = Professor %>%
+  filter(!is.na(weight_tons) & !is.na(volume_cubic_yards) & 
+         !is.na(plastic_bottles) & !is.na(polystyrene) & 
+         !is.na(cigarette_butts)& !is.na(glass_bottles)& !is.na(plastic_bags)& !is.na(wrappers)& !is.na(homes_powered))%>%
+  mutate(year = as.character(year))
+
+Gwynnda = 
+  readxl::read_excel("~/Desktop/p8105_hw2_xw2972/202409 Trash Wheel Collection Data.xlsx", sheet = "Gwynnda Trash Wheel", range = "A2:L265")|>
+  mutate(Company = "Gwynnda_Trash_Wheel")
+Gwynnda= 
+    janitor::clean_names(Gwynnda)
+Gwynnda_cleaned = Gwynnda %>%
+  filter(!is.na(weight_tons) & !is.na(volume_cubic_yards) & 
+         !is.na(plastic_bottles) & !is.na(polystyrene) & 
+         !is.na(cigarette_butts)& !is.na(plastic_bags)& !is.na(wrappers)& !is.na(homes_powered))%>%
+  mutate(year = as.character(year))
+
+combined_trash_wheel_df = bind_rows(Mr_cleaned, Professor_cleaned, Gwynnda_cleaned)
+```
+
+# Problem 3
+I found the format of the results_df is not correct, then I removed the initial row with the explanations and using the correct row as the header with the skip argument. I checked the variables and their type by using the glimpse function. Then I changed the baker_name to baker in bakers_df to join it with bakes_df. The baker names doesn't match since the names in bakers_df are full name, so I only keep the first name. The final dataset has 548 obs and 10 variables, such as signature bake and hometown.  
+The average view for season 1 is 2.77, the average view for season 5 is 10.04.
+```{r}
+library(tidyr)
+bakers_df = 
+    read_csv("~/Desktop/p8105_hw2_xw2972/bakers.csv", na = c("NA", ".", ""))|>
+  janitor::clean_names()
+bakers_df = bakers_df %>%
+  rename(baker = baker_name)
+bakers_df = bakers_df %>%
+  separate(baker, into = c("baker", "last_name"), sep = " ", extra = "drop", fill = "right") %>%
+  select(-last_name) # Keep only the first name
+
+glimpse(bakers_df)
+
+bakes_df = 
+    read_csv("~/Desktop/p8105_hw2_xw2972/bakes.csv", na = c("NA", ".", ""))|>
+  janitor::clean_names()
+glimpse(bakes_df)
+
+results_df = 
+    read_csv("~/Desktop/p8105_hw2_xw2972/results.csv", skip = 2, na = c("NA", ".", ""))|>
+  janitor::clean_names()
+glimpse(results_df)
+
+combined_df <- left_join(bakes_df, bakers_df, by = c("baker" = "baker", "series" = "series"))
+combined_df <- left_join(combined_df,  results_df, by = c("baker" = "baker", "series" = "series", "episode" = "episode"))
+
+#Export the dataframe as csv file. 
+library(readr)
+output_directory <- "~/Desktop/p8105_hw2_xw2972/"  
+output_file_path <- file.path(output_directory, "combined_bakes_bakers_results.csv")
+write_csv(combined_df, output_file_path)
+
+#Showing the star baker or winner of each episode in Seasons 5 through 10.
+star_bakers_winners <- results_df %>%
+  filter(series >= 5 & series <= 10) %>%
+  select(series, episode, baker, result) %>%
+  filter(result %in% c("STAR BAKER", "WINNER")) %>%
+  arrange(series, episode)
+print(star_bakers_winners)
+
+#Viewers
+viewers_df <- read_csv("~/Desktop/p8105_hw2_xw2972/viewers.csv", na = c("NA", ".", "")) %>%
+  janitor::clean_names()
+
+viewers_long <- viewers_df |> 
+  pivot_longer(
+    cols = starts_with("series"),
+    names_to = "season",
+    values_to = "viewership"
+  ) |> 
+  mutate(season = as.numeric(gsub("series_", "", season)))  
+
+print(head(viewers_long, 10))
+
+average_viewership_season_1 <- viewers_long |> 
+  filter(season == 1) |> 
+  summarise(average_viewership = mean(viewership, na.rm = TRUE))
+
+average_viewership_season_5 <- viewers_long |> 
+  filter(season == 5) |> 
+  summarise(average_viewership = mean(viewership, na.rm = TRUE))
+
+print(average_viewership_season_1)
+print(average_viewership_season_5)
+```
